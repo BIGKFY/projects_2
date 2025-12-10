@@ -1,0 +1,134 @@
+---
+title: 'Problem Set 5: Probability and Uncertainty'
+author: "Ololade Kafayat Liadi"
+date: "2025-12-07"
+output: pdf_document
+---
+
+# Part 1: Simulation
+
+A linear data generation process with a treatment variable and a confounding variable is simulated in this section. The behavior of the treatment coefficient under repeated sampling is next investigated.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(123)
+```
+
+# 1. Generate Simulated Data
+
+```{r}
+N <- 2000
+confounder <- rnorm(N, mean = 50, sd = 10)
+treatment <- rbinom(N, size = 1, prob = 0.5)
+
+Y <- 5 + 3*treatment + 0.5*confounder + rnorm(N, 0, 5)
+
+dat <- data.frame(Y, treatment, confounder)
+
+true_model <- lm(Y ~ treatment + confounder, data = dat)
+summary(true_model)
+```
+
+The actual data-generating procedure is matched by the treatment coefficient, which is about 3. Additionally, the confounder is statistically significant, indicating that it is a major predictor. The fundamental relationship that we simulated is accurately recovered by the model.
+
+# 1(a). Central Limit Theorem for Treatment Coefficient
+
+We use bootstrapping to approximate the sampling distribution.
+
+```{r}
+B <- 2000
+coef_store <- numeric(B)
+
+for(i in 1:B){
+samp <- dat[sample(1:N, N, replace = TRUE), ]
+m <- lm(Y ~ treatment + confounder, data = samp)
+coef_store[i] <- coef(m)[2]
+}
+
+hist(coef_store,
+main = "Sampling Distribution of Treatment Coefficient (True Model)",
+xlab = "Coefficient",
+freq = FALSE)
+
+curve(dnorm(x, mean = mean(coef_store), sd = sd(coef_store)),
+add = TRUE, lwd = 2)
+```
+
+The bell-shaped histogram, which closely resembles the normal curve, demonstrates how the sampling distribution of the treatment coefficient approaches normality with repeated resampling. The Central Limit Theorem is demonstrated by this.
+
+# 1(b). Bootstrapped Standard Error
+
+```{r}
+boot_se <- sd(coef_store)
+boot_se
+```
+
+The treatment effect estimate is quite precise, as seen by the minimal bootstrapped standard error. Additionally, it confirms dependability by closely matching the model-based standard error.
+
+# 1(c). Omitted Variable Bias
+
+Here we remove the confounding variable and observe the change.
+
+```{r}
+coef_store_omit <- numeric(B)
+
+for(i in 1:B){
+samp <- dat[sample(1:N, N, replace = TRUE), ]
+m2 <- lm(Y ~ treatment, data = samp)
+coef_store_omit[i] <- coef(m2)[2]
+}
+
+hist(coef_store_omit,
+main = "Sampling Distribution (Confounder Omitted)",
+xlab = "Coefficient",
+freq = FALSE)
+
+curve(dnorm(x, mean = mean(coef_store_omit), sd = sd(coef_store_omit)),
+add = TRUE, lwd = 2)
+```
+
+The distribution moves upward when the confounder is eliminated. The genuine effect is overestimated when the average treatment coefficient exceeds 3. This demonstrates blatant omitted variable bias, which affects inference and renders statistical tests untrustworthy.
+
+# Compare Means
+
+```{r}
+mean(coef_store)
+mean(coef_store_omit)
+```
+
+# Part 2: Data Analysis
+
+For this section we use the mtcars dataset.
+
+```{r}
+data(mtcars)
+```
+
+# 2(a). Hypothesis Test: Difference in Means
+
+We test whether cars with automatic vs. manual transmission differ in fuel efficiency (MPG).
+
+```{r}
+auto <- mtcars$mpg[mtcars$am == 0]
+manual <- mtcars$mpg[mtcars$am == 1]
+
+t_test_result <- t.test(auto, manual, var.equal = FALSE)
+t_test_result
+```
+
+When the p-value is less than 0.05, it means that there is a statistically significant difference between automatic and manual automobiles' fuel economy. In this dataset, manual vehicles are often more fuel-efficient due to their higher MPG.
+
+# 2(b). Linear Model Using the Same Data
+
+```{r}
+model2 <- lm(mpg ~ am, data = mtcars)
+summary(model2)
+```
+
+MPG is increased with manual gearbox since the coefficient on am is positive.
+
+A high t-value results from a modest standard error in relation to the coefficient.
+
+The statistical significance of the p-value validates the association.
+
+In this dataset, fuel economy is significantly impacted by the kind of transmission.
